@@ -1,0 +1,22 @@
+[Unit]
+Description=Tradeflow web (Next.js)
+After=network-online.target tradeflow-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/tradeflow/apps/web
+EnvironmentFile=/home/ec2-user/tradeflow/.env
+Environment=NODE_ENV=production
+# The web app calls the API over the loopback interface, not through nginx, so
+# a restart of nginx cannot break server actions.
+Environment=API_BASE_URL=http://127.0.0.1:3001
+ExecStart=/home/ec2-user/tradeflow/node_modules/.bin/next start -p 3000
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,24 @@
+[Unit]
+Description=Tradeflow API (NestJS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/tradeflow/apps/api
+EnvironmentFile=/home/ec2-user/tradeflow/.env
+Environment=NODE_ENV=production
+# RDS presents a certificate signed by the AWS RDS CA, which is not in Node's
+# default trust store. Without this the API starts and then fails on the first
+# query with "self-signed certificate in certificate chain".
+Environment=NODE_EXTRA_CA_CERTS=/etc/ssl/rds/global-bundle.pem
+Environment=PORT=3001
+ExecStart=/home/ec2-user/.local/bin/node dist/main.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
