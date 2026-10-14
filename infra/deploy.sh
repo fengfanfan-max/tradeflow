@@ -19,7 +19,7 @@
 set -euo pipefail
 
 APP="${APP:-tradeflow}"
-REGION="${AWS_REGION:?set AWS_REGION, e.g. eu-west-2}"
+REGION="${AWS_REGION:-}"
 DB_INSTANCE="${APP}-db"
 DB_NAME="tradeflow"
 DB_USER="tradeflow"
@@ -34,14 +34,34 @@ warn() { printf '  \033[33m!\033[0m %s\n' "$*" >&2; }
 die()  { printf '  \033[31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 
 # ---------------------------------------------------------------- preflight --
+usage() {
+  cat >&2 <<'MSG'
+Tradeflow → AWS.
+
+  export AWS_REGION=eu-west-2
+  export GITHUB_REPO_URL='https://github.com/<you>/tradeflow'
+  ./infra/deploy.sh            # create or update
+  ./infra/deploy.sh destroy    # tear down
+
+Needs the AWS CLI and credentials:
+  aws configure && aws sts get-caller-identity
+MSG
+  exit 1
+}
+
 preflight() {
+  # Everything that can be checked without touching the network is checked
+  # first, so a misconfiguration is reported before a slow API call rather than
+  # after one.
+  [[ -n "$REGION" ]] || { printf '\033[31m✗\033[0m AWS_REGION is not set.\n\n' >&2; usage; }
+  [[ -n "${GITHUB_REPO_URL:-}" ]] || {
+    printf '\033[31m✗\033[0m GITHUB_REPO_URL is not set.\n\n' >&2; usage
+  }
   command -v aws >/dev/null 2>&1 || die "aws CLI not found. brew install awscli"
 
   if ! ACCOUNT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null); then
     die "no usable AWS credentials. Run 'aws configure' or set AWS_PROFILE."
   fi
-
-  [[ -n "${GITHUB_REPO_URL:-}" ]] || die "set GITHUB_REPO_URL to the repository App Runner should build from"
 
   log "account ${ACCOUNT}, region ${REGION}"
   printf '  This will create billable resources in %s. Continue? [y/N] ' "$ACCOUNT"
@@ -262,5 +282,5 @@ destroy() {
 case "${1:-deploy}" in
   deploy)  preflight; ensure_secrets; ensure_network; ensure_database; ensure_app_runner; summary ;;
   destroy) destroy ;;
-  *)       echo "usage: $0 [deploy|destroy]" >&2; exit 1 ;;
+  *)       usage ;;
 esac
