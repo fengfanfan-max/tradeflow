@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  The portfolio grid shows this at roughly 400px wide. Everything here is sized
+  for that: two facts a client can read without squinting, not a screenshot with
+  a caption bolted on.
+
+  Rendered at 1600x900 and cropped to 1200x675. See the note at the bottom of
+  the portfolio file for the command.
+-->
+<style>
+  @font-face { font-family: 'ui'; src: local('-apple-system'), local('Helvetica Neue'); }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 1600px; height: 900px; overflow: hidden;
+    background: #08090b;
+    font-family: -apple-system, 'Helvetica Neue', 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .frame {
+    width: 100%; height: 100%;
+    display: grid; grid-template-columns: 620px 1fr;
+    gap: 56px; padding: 92px 0 92px 96px;
+    position: relative;
+  }
+
+  /* A single warm wash behind the wordmark, so the thumbnail has a focal point
+     even when the screenshot on the right is illegible. */
+  .glow {
+    position: absolute; left: -180px; top: -140px;
+    width: 900px; height: 700px; pointer-events: none;
+    background: radial-gradient(circle at 35% 40%, rgba(245,165,36,.16), transparent 62%);
+  }
+
+  .left { position: relative; z-index: 1; display: flex; flex-direction: column; }
+
+  .mark {
+    display: flex; align-items: center; gap: 16px; margin-bottom: 54px;
+  }
+  .mark .glyph {
+    width: 52px; height: 52px; border-radius: 13px;
+    background: #f5a524; color: #16100a;
+    display: grid; place-items: center;
+    font-size: 27px; font-weight: 800; letter-spacing: -.02em;
+  }
+  .mark .name { font-size: 27px; font-weight: 650; color: #e7eaf0; letter-spacing: -.01em; }
+
+  h1 {
+    font-size: 68px; line-height: 1.06; font-weight: 700;
+    color: #e7eaf0; letter-spacing: -.032em; margin-bottom: 26px;
+  }
+  h1 em { font-style: normal; color: #f5a524; }
+
+  .sub {
+    font-size: 25px; line-height: 1.5; color: #99a1af;
+    letter-spacing: -.005em; margin-bottom: 46px; max-width: 520px;
+  }
+
+  .flow {
+    display: flex; align-items: center; gap: 9px; flex-wrap: nowrap;
+    margin-bottom: 52px;
+  }
+  .flow span {
+    font-size: 15px; font-weight: 600; color: #e7eaf0;
+    background: #14171c; border: 1px solid #2c323c;
+    padding: 8px 12px; border-radius: 8px; letter-spacing: -.005em;
+  }
+  .flow i { color: #4a515e; font-style: normal; font-size: 15px; }
+
+  .facts { margin-top: auto; display: flex; gap: 44px; }
+  .fact .n {
+    font-size: 38px; font-weight: 700; color: #f5a524;
+    letter-spacing: -.025em; line-height: 1;
+  }
+  .fact .l {
+    font-size: 15px; color: #99a1af; margin-top: 9px;
+    letter-spacing: .01em; line-height: 1.35; max-width: 168px;
+  }
+
+  /* Browser chrome, because an unstyled screenshot reads as "a design" and a
+     framed one reads as "a working application". */
+  .right { position: relative; z-index: 1; display: flex; align-items: center; padding-right: 0; }
+  .browser {
+    width: 100%; border-radius: 14px 0 0 14px; overflow: hidden;
+    border: 1px solid #2c323c; border-right: none;
+    box-shadow: 0 34px 90px rgba(0,0,0,.62);
+    background: #0e1013;
+  }
+  .bar {
+    height: 38px; background: #14171c; border-bottom: 1px solid #1e2229;
+    display: flex; align-items: center; gap: 8px; padding: 0 15px;
+  }
+  .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .url {
+    margin-left: 12px; font-size: 13px; color: #6b7280;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+  .browser img {
+    display: block; width: 100%; height: 560px;
+    object-fit: cover; object-position: top left;
+  }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="glow"></div>
+
+    <div class="left">
+      <div class="mark">
+        <div class="glyph">T</div>
+        <div class="name">Tradeflow</div>
+      </div>
+
+      <h1>Job management for <em>trade businesses</em></h1>
+      <p class="sub">
+        One job, from the customer's first message to a paid invoice — with the
+        scheduling and billing rules enforced by PostgreSQL, not by hope.
+      </p>
+
+      <div class="flow">
+        <span>Quote</span><i>→</i>
+        <span>Accept</span><i>→</i>
+        <span>Schedule</span><i>→</i>
+        <span>Complete</span><i>→</i>
+        <span>Invoice</span><i>→</i>
+        <span>Paid</span>
+      </div>
+
+      <div class="facts">
+        <div class="fact">
+          <div class="n">2</div>
+          <div class="l">invariants enforced by the database, not the app</div>
+        </div>
+        <div class="fact">
+          <div class="n">54</div>
+          <div class="l">tests against real PostgreSQL</div>
+        </div>
+        <div class="fact">
+          <div class="n">10</div>
+          <div class="l">design decisions written up</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="browser">
+        <div class="bar">
+          <div class="dot" style="background:#3f4653"></div>
+          <div class="dot" style="background:#3f4653"></div>
+          <div class="dot" style="background:#3f4653"></div>
+          <div class="url">Today · Tradeflow</div>
+        </div>
+        <img src="01-dashboard.jpg" alt="">
+      </div>
+    </div>
+  </div>
+</body>
+</html>

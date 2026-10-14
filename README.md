@@ -9,6 +9,10 @@ the interesting decisions are written down in [`docs/adr/`](docs/adr/).
 **Stack:** Next.js · NestJS · PostgreSQL · TypeScript · AWS
 
 <p align="center">
+  <img src="docs/screenshots/00-cover.jpg" alt="Tradeflow — job management for trade businesses" width="880" />
+</p>
+
+<p align="center">
   <img src="docs/screenshots/01-dashboard.jpg" alt="Tradeflow dashboard — today's jobs, unpaid invoices, accepted work waiting to be booked" width="880" />
 </p>
 
