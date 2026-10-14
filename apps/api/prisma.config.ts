@@ -19,10 +19,17 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   datasource: {
     url: env('DATABASE_URL'),
-    // `migrate dev` diffs against a scratch database. Passing it explicitly
+    // `migrate dev` diffs against a scratch database, and passing it explicitly
     // keeps the behaviour identical on a developer machine and in CI, where the
     // connecting role may not have CREATE DATABASE rights.
-    shadowDatabaseUrl: env('SHADOW_DATABASE_URL'),
+    //
+    // Optional, because `migrate deploy` does not use a shadow database at all.
+    // Requiring it here meant a production deploy failed on a variable that only
+    // exists to serve a development command — and the failure named the config
+    // file rather than the command that did not need it.
+    ...(process.env.SHADOW_DATABASE_URL
+      ? { shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL }
+      : {}),
   },
   migrations: {
     path: 'prisma/migrations',
