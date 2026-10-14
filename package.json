@@ -1,0 +1,31 @@
+{
+  "name": "tradeflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Job management for trade businesses \u2014 customers, quotes, jobs, scheduling and invoicing.",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm --filter @tradeflow/shared build && pnpm --filter @tradeflow/api build && pnpm --filter @tradeflow/web build",
+    "typecheck": "pnpm --filter @tradeflow/shared build && pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @tradeflow/api test:e2e",
+    "db:migrate": "pnpm --filter @tradeflow/api db:migrate",
+    "db:seed": "pnpm --filter @tradeflow/api db:seed",
+    "db:reset": "pnpm --filter @tradeflow/api db:reset",
+    "dev:api": "pnpm --filter @tradeflow/api dev",
+    "dev:web": "pnpm --filter @tradeflow/web dev",
+    "verify": "bash scripts/verify.sh",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "check:prisma": "bash scripts/check-prisma-imports.sh",
+    "db:local": "bash scripts/db-local.sh start"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3"
+  }
+}

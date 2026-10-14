@@ -1,0 +1,28 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# pnpm 11 does not run dependency install scripts unless each package is opted in
+# here. Note the shape: `onlyBuiltDependencies` (the pnpm 10 key) is silently
+# ignored by pnpm 11, which expects a map of package name to boolean.
+#
+# Reviewing this list matters more than filling it in: an install script is
+# arbitrary code execution from a transitive dependency.
+allowBuilds:
+  # Fetches the query engine binaries. Without it the generated client is a stub
+  # that compiles and then fails on the first query.
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true
+
+  # Native binaries behind the NestJS and Next.js build pipelines.
+  '@swc/core': true
+  esbuild: true
+  unrs-resolver: true
+  sharp: true
+
+  # Scarf reports install metrics to the package author. It arrives transitively
+  # through @nestjs/swagger and is left disabled on purpose: nothing in this
+  # project needs it, and a build-time phone home is not something to opt into by
+  # default. Set to `true` only if you specifically want that telemetry.
+  '@scarf/scarf': false

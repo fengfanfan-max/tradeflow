@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Narrowed to the source directory so the compiled entry point is
+    // `dist/main.js` rather than `dist/src/main.js`. The root tsconfig keeps the
+    // wider include so that `tsc --noEmit` also checks the seed, the scripts and
+    // the tests, which are run by tsx and never compiled.
+    "rootDir": "./src",
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test",
+    "src/**/*.spec.ts",
+    "src/**/*.e2e-spec.ts"
+  ]
+}

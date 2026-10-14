@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "tsConfigPath": "tsconfig.build.json",
+    "assets": [
+      {
+        "//": "The Prisma client is generated JavaScript, not TypeScript, so tsc does not copy it. Without this the compiled output requires ./generated/prisma and finds nothing — which only shows up at runtime, not at build time.",
+        "include": "generated/**/*",
+        "outDir": "dist"
+      }
+    ],
+    "watchAssets": true
+  }
+}

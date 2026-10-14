@@ -1,0 +1,349 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens.
+ *
+ * Tailwind v4 reads `@theme`, so every colour below is simultaneously a CSS
+ * variable and a utility (`bg-surface`, `text-ink-dim`, `border-line`). There is
+ * no tailwind.config.js: one place to change a colour, and it is this one.
+ *
+ * The palette is a near-black canvas with a single accent. A tool that is open
+ * all day is read, not looked at, so the surfaces separate by a few points of
+ * luminance rather than by shadow, and colour is reserved for status and for the
+ * one thing on screen the operator should click.
+ */
+@theme {
+  --color-canvas: #08090b;
+  --color-surface: #0e1013;
+  --color-raised: #14171c;
+  --color-inset: #0a0b0e;
+  --color-hover: #191d23;
+
+  --color-line: #1e2229;
+  --color-line-strong: #2c323c;
+
+  --color-ink: #e7eaf0;
+  --color-ink-dim: #99a1af;
+  --color-ink-faint: #626a78;
+
+  --color-accent: #f5a524;
+  --color-accent-hover: #ffb945;
+  --color-accent-ink: #16100a;
+  --color-accent-wash: #2a1f0c;
+
+  --color-ok: #4ade80;
+  --color-ok-wash: #10261a;
+  --color-warn: #fbbf24;
+  --color-warn-wash: #2a2110;
+  --color-bad: #f87171;
+  --color-bad-wash: #2b1416;
+  --color-info: #7dd3fc;
+  --color-info-wash: #0f2230;
+  --color-neutral-wash: #191d23;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --radius-panel: 10px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Base                                                                */
+/* ------------------------------------------------------------------ */
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * A single visible focus treatment for every interactive element. The default
+ * outline disappears against a dark canvas on several browsers, and losing focus
+ * position is the fastest way to make a keyboard-unusable form.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  border-radius: 3px;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-canvas);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3b424e;
+}
+
+/* ------------------------------------------------------------------ */
+/* Component classes                                                   */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Money, quantities and dates get tabular figures so that a column of numbers
+ * lines up digit-for-digit and a total can be compared to the column above it
+ * without reading each value.
+ */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
+}
+
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+}
+
+.panel-raised {
+  background: var(--color-raised);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+}
+
+/* Form controls ---------------------------------------------------- */
+
+.control {
+  width: 100%;
+  background: var(--color-inset);
+  border: 1px solid var(--color-line-strong);
+  border-radius: 6px;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-ink);
+}
+
+.control::placeholder {
+  color: var(--color-ink-faint);
+}
+
+.control:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.control[aria-invalid='true'] {
+  border-color: var(--color-bad);
+}
+
+select.control {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-ink-dim) 50%),
+    linear-gradient(135deg, var(--color-ink-dim) 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) calc(50% + 1px),
+    calc(100% - 10px) calc(50% + 1px);
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 1.75rem;
+}
+
+.label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+  margin-bottom: 0.375rem;
+}
+
+/* Buttons ---------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-raised);
+  color: var(--color-ink);
+  padding: 0.4375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--color-hover);
+  border-color: #3b424e;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.btn-danger {
+  color: var(--color-bad);
+  border-color: #43232a;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--color-bad-wash);
+  border-color: #5c2f38;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-ink-dim);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--color-ink);
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* Tables ----------------------------------------------------------- */
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-line-strong);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+  white-space: nowrap;
+}
+
+.table tbody td {
+  border-bottom: 1px solid var(--color-line);
+  padding: 0.5rem 0.75rem;
+  vertical-align: middle;
+}
+
+.table tbody tr:hover td {
+  background: var(--color-hover);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table .right {
+  text-align: right;
+}
+
+/* Links ------------------------------------------------------------ */
+
+.link {
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--color-accent);
+}
+
+/* ------------------------------------------------------------------ */
+/* The customer's quote page                                           */
+/* ------------------------------------------------------------------ */
+
+/*
+ * This page is printed or saved as a PDF by the customer, so it is a light
+ * document rather than part of the dark application — and the browser's print
+ * dialogue is a first-class target, not an afterthought.
+ */
+.paper {
+  background: #ffffff;
+  color: #16181d;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .paper {
+    box-shadow: none !important;
+    border: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  .paper a {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  /* Keep a line and its own figures on the same sheet. */
+  tr,
+  .keep-together {
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+}

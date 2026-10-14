@@ -1,0 +1,72 @@
+# A complete stack on one host: PostgreSQL, the API, and the web app.
+#
+# This is the shape a real deployment takes on a VPS or an EC2 instance, and it
+# is the closest thing to what the AWS services below are doing for you:
+#
+#   docker compose -f infra/docker-compose.yml up --build
+#
+# The database is a volume rather than a container you are expected to manage,
+# which is fine for a demo and not what you would do for a client with data they
+# care about — use RDS or a managed provider there, and keep the backup and
+# failover work off your own plate.
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tradeflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: tradeflow
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U tradeflow']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Not published to the host: the API is the only thing that needs to reach it.
+    expose:
+      - '5432'
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: '3001'
+      DATABASE_URL: postgresql://tradeflow:${POSTGRES_PASSWORD}@db:5432/tradeflow?schema=public
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET to at least 32 characters}
+      PUBLIC_WEB_ORIGIN: ${PUBLIC_WEB_ORIGIN:?set PUBLIC_WEB_ORIGIN to the web app's public URL}
+      CORS_ORIGINS: ${PUBLIC_WEB_ORIGIN}
+      AI_PROVIDER: ${AI_PROVIDER:-heuristic}
+    # Runs the migrations and the seed before serving, so a fresh stack comes up
+    # with the demo data in it. A real deployment would run migrations as a
+    # release step and never seed in production.
+    command: >
+      sh -c "pnpm exec prisma migrate deploy &&
+             pnpm exec prisma db seed &&
+             node dist/main.js"
+    ports:
+      - '3001:3001'
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      API_BASE_URL: http://api:3001
+    ports:
+      - '3000:3000'
+
+volumes:
+  db-data:

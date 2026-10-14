@@ -1,0 +1,508 @@
+// Tradeflow domain model.
+//
+// Three decisions are worth reading before the tables.
+//
+// 1. Money is an integer count of minor units plus a currency code. Never a
+//    float, never a Decimal. See packages/shared/src/money.ts.
+//
+// 2. An invoice line is a *snapshot*, not a reference to a quote line. An
+//    invoice is a legal document: what it said when it was issued must not
+//    change because someone later corrected a quote. Quote lines join to the
+//    invoice only as provenance (`sourceQuoteLineId`), and nothing reads it to
+//    compute a total.
+//
+// 3. Scheduling overlap is prevented by a database exclusion constraint added in
+//    a migration, not only by application code. Two office users can book the
+//    same engineer at the same time by racing; a constraint cannot be raced.
+
+generator client {
+  provider = "prisma-client-js"
+
+  // An explicit output path is the documented setup for a pnpm workspace.
+  // Without it the client is generated into a content-addressed store directory
+  // and reached through `@prisma/client`'s re-export of `.prisma/client/default`
+  // — a path that changes whenever the peer graph changes, which silently
+  // invalidates every type that depends on it.
+  output = "../src/generated/prisma"
+}
+
+datasource db {
+  // Prisma 7 moved the connection URL out of the schema and into
+  // prisma.config.ts, and the runtime client now takes a driver adapter.
+  provider = "postgresql"
+}
+
+/**
+ * ------------------------------------------------------------------
+ */
+/**
+ * Tenancy
+ */
+/**
+ * ------------------------------------------------------------------
+ */
+
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(200)
+  slug      String   @unique @db.VarChar(60)
+  currency  String   @default("GBP") @db.Char(3)
+  /// UK VAT registration number, printed on invoices when present.
+  vatNumber String?  @db.VarChar(40)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  users          User[]
+  customers      Customer[]
+  sites          Site[]
+  priceBookItems PriceBookItem[]
+  quotes         Quote[]
+  jobs           Job[]
+  invoices       Invoice[]
+  counters       DocumentCounter[]
+
+  @@map("tenants")
+}
+
+enum UserRole {
+  OWNER
+  OFFICE
+  ENGINEER
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  email        String   @db.VarChar(200)
+  name         String   @db.VarChar(200)
+  role         UserRole
+  passwordHash String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedJobs Job[]            @relation("JobAssignee")
+  statusEvents JobStatusEvent[]
+  decisions    QuoteDecision[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, role])
+  @@map("users")
+}
+
+/**
+ * ------------------------------------------------------------------
+ */
+/**
+ * Customers and sites
+ */
+/**
+ * ------------------------------------------------------------------
+ */
+
+model Customer {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @db.Uuid
+  name     String  @db.VarChar(200)
+  email    String? @db.VarChar(200)
+  phone    String? @db.VarChar(40)
+  notes    String? @db.Text
+
+  // Billing address, flattened. It is written once and read as a block on the
+  // invoice, so a separate table would add a join and no flexibility worth having.
+  billingLine1    String? @db.VarChar(200)
+  billingLine2    String? @db.VarChar(200)
+  billingCity     String? @db.VarChar(120)
+  billingPostcode String? @db.VarChar(20)
+  billingCountry  String? @db.Char(2)
+
+  /// Archived customers are hidden from pickers but keep their history.
+  archivedAt DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sites    Site[]
+  quotes   Quote[]
+  jobs     Job[]
+  invoices Invoice[]
+
+  @@index([tenantId, archivedAt])
+  @@index([tenantId, name])
+  @@map("customers")
+}
+
+/// Where the work happens. Deliberately separate from the customer: letting
+/// agents and landlords hold several properties under one account is the normal
+/// case, and their billing address is not the address a van drives to.
+model Site {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @db.Uuid
+  customerId  String  @db.Uuid
+  label       String  @db.VarChar(120)
+  line1       String  @db.VarChar(200)
+  line2       String? @db.VarChar(200)
+  city        String  @db.VarChar(120)
+  postcode    String  @db.VarChar(20)
+  country     String  @default("GB") @db.Char(2)
+  /// Gate codes, parking, key safe locations — the detail that wastes a visit.
+  accessNotes String? @db.Text
+
+  archivedAt DateTime? @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  quotes   Quote[]
+  jobs     Job[]
+
+  @@index([tenantId, customerId])
+  @@map("sites")
+}
+
+/**
+ * ------------------------------------------------------------------
+ */
+/**
+ * Price book
+ */
+/**
+ * ------------------------------------------------------------------
+ */
+
+enum PriceUnit {
+  HOUR
+  DAY
+  EACH
+  SQUARE_METRE
+  METRE
+}
+
+model PriceBookItem {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid
+  code        String    @db.VarChar(40)
+  description String    @db.VarChar(300)
+  unit        PriceUnit
+  /// Net unit price in minor units.
+  unitPrice   Int
+  /// Tax rate in basis points. 2000 = 20%.
+  taxRateBp   Int       @default(2000)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quoteLines QuoteLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, active])
+  @@map("price_book_items")
+}
+
+/**
+ * ------------------------------------------------------------------
+ */
+/**
+ * Quotes
+ */
+/**
+ * ------------------------------------------------------------------
+ */
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+/// What a customer can actually decide.
+///
+/// Deliberately not `QuoteStatus`. Reusing that enum would let DRAFT, SENT or
+/// EXPIRED be stored as a decision — states that describe what the business did
+/// with a quote, not what the customer said about it. Only the DTO stood between
+/// those and the database; this removes the possibility.
+enum QuoteDecisionOutcome {
+  ACCEPTED
+  DECLINED
+}
+
+model Quote {
+  id         String      @id @default(uuid()) @db.Uuid
+  tenantId   String      @db.Uuid
+  customerId String      @db.Uuid
+  siteId     String      @db.Uuid
+  /// Human-facing, unique per tenant. Assigned on first save.
+  number     String      @db.VarChar(30)
+  status     QuoteStatus @default(DRAFT)
+
+  /// Optimistic concurrency. Every write asserts the version the caller read;
+  /// a stale write is rejected rather than silently overwriting the other edit.
+  version Int @default(1)
+
+  currency   String    @default("GBP") @db.Char(3)
+  notes      String?   @db.Text
+  validUntil DateTime  @db.Date
+  issuedAt   DateTime? @db.Timestamptz(3)
+  decidedAt  DateTime? @db.Timestamptz(3)
+
+  /// Unguessable token for the customer's no-login accept page. Rotated on send.
+  publicToken String @unique @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer  Customer        @relation(fields: [customerId], references: [id])
+  site      Site            @relation(fields: [siteId], references: [id])
+  lines     QuoteLine[]
+  decisions QuoteDecision[]
+  jobs      Job[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+  @@index([tenantId, customerId])
+  @@map("quotes")
+}
+
+model QuoteLine {
+  id              String  @id @default(uuid()) @db.Uuid
+  quoteId         String  @db.Uuid
+  /// Provenance only. Denormalised so a price book edit cannot rewrite history.
+  priceBookItemId String? @db.Uuid
+  position        Int
+  description     String  @db.VarChar(300)
+  quantity        Int
+  unitPrice       Int
+  taxRateBp       Int     @default(2000)
+
+  quote         Quote          @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  priceBookItem PriceBookItem? @relation(fields: [priceBookItemId], references: [id])
+  invoiceLines  InvoiceLine[]
+
+  @@unique([quoteId, position])
+  @@index([quoteId])
+  @@map("quote_lines")
+}
+
+/// Append-only. A declined quote keeps its reason; an accepted one keeps who
+/// accepted it and from where, which is the first question asked in a dispute.
+model QuoteDecision {
+  id            String      @id @default(uuid()) @db.Uuid
+  quoteId       String      @db.Uuid
+  decision      QuoteDecisionOutcome
+  note          String?     @db.Text
+  userId        String?     @db.Uuid
+  /// Set when the decision came through the public link rather than the app.
+  viaPublicLink Boolean     @default(false)
+  ipAddress     String?     @db.VarChar(64)
+  createdAt     DateTime    @default(now()) @db.Timestamptz(3)
+
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id])
+
+  @@index([quoteId])
+  @@map("quote_decisions")
+}
+
+/**
+ * ------------------------------------------------------------------
+ */
+/**
+ * Jobs
+ */
+/**
+ * ------------------------------------------------------------------
+ */
+
+enum JobStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Job {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @db.Uuid
+  quoteId    String    @db.Uuid
+  customerId String    @db.Uuid
+  siteId     String    @db.Uuid
+  assigneeId String?   @db.Uuid
+  number     String    @db.VarChar(30)
+  status     JobStatus @default(SCHEDULED)
+  version    Int       @default(1)
+
+  scheduledStart    DateTime @db.Timestamptz(3)
+  scheduledEnd      DateTime @db.Timestamptz(3)
+  /// Required to move to COMPLETED. Becomes the invoice narrative.
+  completionSummary String?   @db.Text
+  completedAt       DateTime? @db.Timestamptz(3)
+
+  notes     String?  @db.Text
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quote        Quote            @relation(fields: [quoteId], references: [id])
+  customer     Customer         @relation(fields: [customerId], references: [id])
+  site         Site             @relation(fields: [siteId], references: [id])
+  assignee     User?            @relation("JobAssignee", fields: [assigneeId], references: [id])
+  statusEvents JobStatusEvent[]
+  attachments  JobAttachment[]
+  invoices     Invoice[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status, scheduledStart])
+  @@index([assigneeId, scheduledStart])
+  @@map("jobs")
+}
+
+/// The audit trail. Written in the same transaction as the status change, so
+/// there is no window in which a job has a status that nothing explains.
+model JobStatusEvent {
+  id         String     @id @default(uuid()) @db.Uuid
+  jobId      String     @db.Uuid
+  fromStatus JobStatus?
+  toStatus   JobStatus
+  note       String?    @db.Text
+  actorId    String?    @db.Uuid
+  createdAt  DateTime   @default(now()) @db.Timestamptz(3)
+
+  job   Job   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([jobId, createdAt])
+  @@map("job_status_events")
+}
+
+enum AttachmentKind {
+  PHOTO
+  DOCUMENT
+  SIGNATURE
+}
+
+model JobAttachment {
+  id         String         @id @default(uuid()) @db.Uuid
+  jobId      String         @db.Uuid
+  kind       AttachmentKind
+  filename   String         @db.VarChar(255)
+  mimeType   String         @db.VarChar(120)
+  byteSize   Int
+  /// Object storage key. The database holds the reference, not the bytes.
+  storageKey String         @db.VarChar(500)
+  note       String?        @db.Text
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("job_attachments")
+}
+
+/**
+ * ------------------------------------------------------------------
+ */
+/**
+ * Invoices
+ */
+/**
+ * ------------------------------------------------------------------
+ */
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  VOID
+}
+
+model Invoice {
+  id         String        @id @default(uuid()) @db.Uuid
+  tenantId   String        @db.Uuid
+  jobId      String?       @db.Uuid
+  customerId String        @db.Uuid
+  number     String        @db.VarChar(30)
+  status     InvoiceStatus @default(DRAFT)
+
+  currency      String @default("GBP") @db.Char(3)
+  /// Totals are stored, not recomputed on read. An invoice must render the same
+  /// in five years as it did on the day it was issued, whatever the tax rules
+  /// or the price book say by then.
+  netTotal      Int
+  taxTotal      Int
+  grossTotal    Int
+  /// Deposit received before the invoice, already deducted from grossTotal.
+  depositAmount Int    @default(0)
+
+  issuedAt         DateTime? @db.Timestamptz(3)
+  dueAt            DateTime? @db.Date
+  paidAt           DateTime? @db.Timestamptz(3)
+  paymentReference String?   @db.VarChar(120)
+  notes            String?   @db.Text
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  job      Job?          @relation(fields: [jobId], references: [id])
+  customer Customer      @relation(fields: [customerId], references: [id])
+  lines    InvoiceLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+  @@index([tenantId, customerId])
+  @@map("invoices")
+}
+
+/// A snapshot. Never recomputed from the quote, so correcting a quote after
+/// invoicing cannot alter an issued document.
+model InvoiceLine {
+  id                String  @id @default(uuid()) @db.Uuid
+  invoiceId         String  @db.Uuid
+  sourceQuoteLineId String? @db.Uuid
+  position          Int
+  description       String  @db.VarChar(300)
+  quantity          Int
+  unitPrice         Int
+  taxRateBp         Int     @default(2000)
+  netAmount         Int
+  taxAmount         Int
+
+  invoice         Invoice    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  sourceQuoteLine QuoteLine? @relation(fields: [sourceQuoteLineId], references: [id])
+
+  @@unique([invoiceId, position])
+  @@index([invoiceId])
+  @@map("invoice_lines")
+}
+
+/**
+ * ------------------------------------------------------------------
+ */
+/**
+ * Counters
+ */
+/**
+ * ------------------------------------------------------------------
+ */
+
+/// Per-tenant sequence for quote, job and invoice numbers.
+///
+/// A counter row rather than `MAX(number) + 1`: the latter races under two
+/// concurrent saves, and it reuses a number after a delete, which is exactly
+/// what an auditor will ask about.
+model DocumentCounter {
+  tenantId  String @db.Uuid
+  kind      String @db.VarChar(20)
+  nextValue Int    @default(1)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, kind])
+  @@map("document_counters")
+}

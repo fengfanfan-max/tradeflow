@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "outDir": "./dist",
+    "rootDir": ".",
+
+    // NestJS resolves constructor dependencies from the metadata the compiler
+    // emits for decorated parameters. Without both of these the DI container
+    // receives `Object` for every provider and fails at boot.
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    // Decorated properties are assigned by the framework, not the constructor,
+    // so strict property initialisation would reject every DTO field.
+    "strictPropertyInitialization": false,
+
+    "types": ["node", "vitest/globals"],
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts", "prisma/**/*.ts", "scripts/**/*.ts", "test/**/*.ts", "vitest.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}

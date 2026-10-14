@@ -1,0 +1,33 @@
+node_modules/
+dist/
+build/
+.next/
+out/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Local database cluster (created by scripts/db-local.sh)
+.pgdata/
+
+# Prisma
+apps/api/src/generated/
+apps/api/prisma/*.db
+
+# Coverage and test output
+coverage/
+*.lcov
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.log
+
+# Vercel / AWS CLI state
+.vercel/
+.aws-sam/
+cdk.out/

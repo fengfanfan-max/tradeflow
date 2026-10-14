@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # A real PostgreSQL, because the invariants under test live in the database:
+  # the exclusion constraint that refuses an overlapping booking, the unique
+  # index behind document numbering, and the transaction boundaries around
+  # multi-step writes. A mock would assert that the code calls what it calls.
+  DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/tradeflow?schema=public
+  SHADOW_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/tradeflow_shadow?schema=public
+  TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/tradeflow_test?schema=public
+  # Any 32+ character string. Not a secret: it only signs tokens within this job.
+  JWT_SECRET: ci-only-signing-key-not-used-anywhere-else-0000
+
+jobs:
+  verify:
+    name: Typecheck, unit and end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tradeflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `version` here on purpose. The version is pinned by `packageManager`
+      # in package.json, and specifying it in both places makes the action fail
+      # with "Multiple versions of pnpm specified" before it runs anything else.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Create the shadow and test databases
+        # psql does not accept the `?schema=` parameter Prisma uses, so the
+        # connection is given as flags rather than as a URL.
+        env:
+          PGPASSWORD: postgres
+        run: |
+          for db in tradeflow_shadow tradeflow_test; do
+            psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c "CREATE DATABASE $db" || true
+          done
+
+      - name: Generate the Prisma client
+        run: pnpm --filter @tradeflow/api db:generate
+
+      - name: Only one Prisma client
+        # `@prisma/client` re-exports a copy from a content-addressed store
+        # directory, which drifts from the generated output after a schema
+        # change. The mismatch surfaces as a runtime error naming a column, so it
+        # is cheaper to forbid the import than to debug it twice.
+        run: bash scripts/check-prisma-imports.sh
+
+      - name: Verify the migration history applies from empty
+        # Not `migrate dev`. This is what a deployment runs, and it is the only
+        # check that the committed migrations actually reproduce the schema —
+        # `migrate dev` would happily diff and patch instead.
+        run: pnpm --filter @tradeflow/api exec prisma migrate deploy
+
+      - name: Check for schema drift
+        # Fails with exit 2 if schema.prisma and the migrated database disagree —
+        # which is what happens when someone edits the schema and forgets the
+        # migration. The scheduling exclusion constraint is added in raw SQL and
+        # is not modelled by Prisma, so it is correctly absent from this
+        # comparison; verified locally that it does not read as drift.
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          pnpm exec prisma migrate status
+          pnpm exec prisma migrate diff \
+            --from-schema=prisma/schema.prisma \
+            --to-config-datasource \
+            --exit-code
+
+      - name: Typecheck
+        # The root script, not `pnpm -r typecheck`. The recursive form runs each
+        # package's own script and skips the shared-package build that the root
+        # one does first, so a clean checkout fails to resolve @tradeflow/shared.
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm --filter @tradeflow/shared test
+
+      # The suite resets and seeds TEST_DATABASE_URL itself, in `globalSetup`,
+      # before any spec opens a connection. A separate seed step here would be
+      # redundant, and it would also run against a database that has had no
+      # migrations applied — which is how it failed the first time.
+      - name: End-to-end tests
+        run: pnpm --filter @tradeflow/api test:e2e
+
+      - name: Build
+        run: pnpm build
+
+      - name: Seed the application database
+        # The smoke test signs in as the seeded owner, so the database it uses
+        # needs the seed data. Migrations are already applied to DATABASE_URL.
+        # The e2e run uses a separate database and seeds that one itself.
+        run: pnpm --filter @tradeflow/api exec prisma db seed
+
+      - name: Smoke test the built API
+        # A build that compiles is not a build that boots. This one catches the
+        # class of failure the compiler cannot see: a missing runtime
+        # dependency, an asset that was not copied, a configuration key that only
+        # matters at startup.
+        run: |
+          set -euo pipefail
+          cd apps/api
+          node dist/main.js &
+          API_PID=$!
+          trap 'kill $API_PID 2>/dev/null || true' EXIT
+
+          for _ in $(seq 1 30); do
+            if curl -sf -o /dev/null http://127.0.0.1:3001/api/auth/session; then break; fi
+            if ! kill -0 $API_PID 2>/dev/null; then echo "API exited during startup"; exit 1; fi
+            sleep 1
+          done
+
+          # Unauthenticated must be 401 with the documented problem shape, not a
+          # 500 and not an HTML error page.
+          code=$(curl -s -o /tmp/session.json -w '%{http_code}' http://127.0.0.1:3001/api/auth/session)
+          test "$code" = "401"
+          grep -q '"code":"UNAUTHENTICATED"' /tmp/session.json
+
+          # The demo account must exist and be able to sign in.
+          token=$(curl -s -X POST http://127.0.0.1:3001/api/auth/login \
+            -H 'content-type: application/json' \
+            -d '{"email":"daniel.halstead@halsteadelectrical.co.uk","password":"demo-password-2026"}' \
+            | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).token||'')}catch{console.log('')}})")
+          test -n "$token"
+
+          code=$(curl -s -o /tmp/customers.json -w '%{http_code}' \
+            -H "authorization: Bearer $token" http://127.0.0.1:3001/api/customers)
+          test "$code" = "200"
+          grep -q '"items"' /tmp/customers.json
+
+      - name: Upload the build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: apps/api/dist
+          retention-days: 3

@@ -1,0 +1,7 @@
+# The customer's quote page is a private document reached by an unguessable
+# token. No token is a link worth indexing, but if one ever leaks into a search
+# result the page would be readable by anyone who finds it — so the path is
+# closed to crawlers here as well as being `robots: noindex` on the page itself.
+User-agent: *
+Disallow: /q/
+Disallow: /login

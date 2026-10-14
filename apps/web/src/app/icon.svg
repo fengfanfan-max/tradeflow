@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Tradeflow">
+  <!-- The accent on the near-black canvas, matching the app's own chrome. -->
+  <rect width="32" height="32" rx="7" fill="#08090b" />
+  <path
+    d="M8 11.5h16M16 11.5V24"
+    stroke="#f5a524"
+    stroke-width="3.2"
+    stroke-linecap="round"
+  />
+</svg>
