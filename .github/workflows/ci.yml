@@ -70,6 +70,15 @@ jobs:
       - name: Generate the Prisma client
         run: pnpm --filter @tradeflow/api db:generate
 
+      - name: Shell scripts are sound
+        # The deploy script cannot be run in CI — it needs an AWS account — so
+        # static analysis is the only check available for it. shellcheck catches
+        # the class of mistake that otherwise surfaces mid-deploy, after the
+        # database has been created.
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck -S warning scripts/*.sh infra/*.sh
+
       - name: Only one Prisma client
         # `@prisma/client` re-exports a copy from a content-addressed store
         # directory, which drifts from the generated output after a schema
