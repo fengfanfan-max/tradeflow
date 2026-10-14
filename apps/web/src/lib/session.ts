@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { sessionSchema, type Session } from '@tradeflow/shared';
@@ -58,12 +58,31 @@ export const getSession = cache(async (): Promise<Session | null> => {
   }
 });
 
+/**
+ * Whether the browser will accept a `secure` cookie.
+ *
+ * This is decided from the request's own scheme, not from NODE_ENV. `next start`
+ * sets NODE_ENV=production, so keying off it marks the cookie secure even when
+ * the app is being served over plain HTTP — a local production run, or a
+ * container behind a load balancer that terminates TLS elsewhere. A `secure`
+ * cookie is not sent over http at all, so the sign-in appears to succeed and
+ * every subsequent request is anonymous, with no error anywhere.
+ *
+ * `x-forwarded-proto` is what a proxy sets; the comma-split takes the first hop
+ * because proxies append to it.
+ */
+async function requestIsSecure(): Promise<boolean> {
+  const list = await headers();
+  const proto = list.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  return proto === 'https';
+}
+
 export async function setSessionCookie(token: string): Promise<void> {
   const store = await cookies();
   store.set(TOKEN_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: await requestIsSecure(),
     path: '/',
     maxAge: EIGHT_HOURS_SECONDS,
   });

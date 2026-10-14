@@ -7,7 +7,6 @@ const nextConfig: NextConfig = {
   // copies `apps/web/public` and `apps/web/.next/static` by hand. That layout is
   // exactly what `standalone` emits — it traces the server's dependencies into
   // one directory — so the Dockerfile and this setting are one decision.
-  output: 'standalone',
 
   // `@tradeflow/shared` is a workspace symlink whose `exports` map points at a
   // CommonJS `dist/`. Without this the server build externalises it and the
