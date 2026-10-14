@@ -8,6 +8,8 @@ the interesting decisions are written down in [`docs/adr/`](docs/adr/).
 
 **Stack:** Next.js · NestJS · PostgreSQL · TypeScript · AWS
 
+**Live demo:** <https://54-66-107-135.sslip.io> — `daniel.halstead@halsteadelectrical.co.uk` / `demo-password-2026`
+
 <p align="center">
   <img src="docs/screenshots/00-cover.jpg" alt="Tradeflow — job management for trade businesses" width="880" />
 </p>

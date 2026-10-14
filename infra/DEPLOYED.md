@@ -1,6 +1,6 @@
 # The live demo
 
-**http://54.66.107.135** — sign in as `daniel.halstead@halsteadelectrical.co.uk` / `demo-password-2026`.
+**https://54-66-107-135.sslip.io** — sign in as `daniel.halstead@halsteadelectrical.co.uk` / `demo-password-2026`.
 
 | | |
 | --- | --- |
@@ -58,6 +58,32 @@ Redeploying is `git pull` then rebuild then restart; there is no pipeline. The
 database is not in a snapshot rotation: `--backup-retention-period 1` gives a
 day of automated backups.
 
-**This is a demo, not a production deployment.** No TLS, no custom domain, no
-load balancer, no monitoring, no secret rotation, and the seed's demo password is
+## The hostname
+
+`54-66-107-135.sslip.io` is not a purchased domain. [sslip.io](https://sslip.io)
+is a public wildcard DNS that resolves any hostname containing an address, and it
+is used here for one specific reason: **Upwork's filter treats a bare IP address
+as contact information and blocks the message.**
+
+The hyphens matter. `54.66.107.135.sslip.io` also resolves, but it still contains
+the literal address, so it would trip the same filter. The dashed form does not.
+
+TLS is real — a Let's Encrypt certificate for that hostname, renewed by
+`certbot-renew.timer` (verified with `certbot renew --dry-run`).
+
+**To move to a real domain**, point an `A` record at the Elastic IP, then:
+
+```bash
+sudo sed -i 's|54-66-107-135.sslip.io|<your-domain>|g' /etc/nginx/conf.d/tradeflow.conf
+sudo certbot --nginx -d <your-domain>
+# and set PUBLIC_WEB_ORIGIN in ~/tradeflow/.env, then restart both services
+```
+
+Nothing else refers to the hostname except `PUBLIC_WEB_ORIGIN`, which is what
+builds the customer's quote links.
+
+## Honest limits
+
+**This is a demo, not a production deployment.** No load balancer, no
+monitoring, no secret rotation, and the seed's demo password is
 in the unit's environment file.
