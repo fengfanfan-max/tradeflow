@@ -25,7 +25,7 @@ export class PriceBookService {
       orderBy: [{ active: 'desc' }, { code: 'asc' }],
       take: 200,
     });
-    return { items: rows.map(serialize), total: rows.length };
+    return { items: rows.map(serialize), total: rows.length, nextCursor: null };
   }
 
   async create(tenantId: string, input: PriceBookItemCreate) {

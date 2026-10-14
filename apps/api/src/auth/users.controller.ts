@@ -32,6 +32,6 @@ export class UsersController {
       orderBy: [{ role: 'asc' }, { name: 'asc' }],
       select: { id: true, name: true, email: true, role: true, active: true },
     });
-    return { items: rows, total: rows.length };
+    return { items: rows, total: rows.length, nextCursor: null };
   }
 }

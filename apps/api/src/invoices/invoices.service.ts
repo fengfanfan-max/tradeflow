@@ -33,7 +33,7 @@ export class InvoicesService {
       take: 200,
       include: listInclude,
     });
-    return { items: rows.map(serialize), total: rows.length };
+    return { items: rows.map(serialize), total: rows.length, nextCursor: null };
   }
 
   async get(tenantId: string, id: string) {

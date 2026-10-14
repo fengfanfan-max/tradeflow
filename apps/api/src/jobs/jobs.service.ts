@@ -52,7 +52,10 @@ export class JobsService {
       take: query.limit,
       include: baseInclude,
     });
-    return { items: rows.map(serialize), total: rows.length };
+    // `nextCursor: null` because this endpoint is capped rather than cursor-paged.
+    // The envelope is uniform so the client needs one deserialiser — see
+    // docs/api-routes.md, "List envelope".
+    return { items: rows.map(serialize), total: rows.length, nextCursor: null };
   }
 
   async get(tenantId: string, id: string) {

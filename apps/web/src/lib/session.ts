@@ -49,7 +49,23 @@ export const getSession = cache(async (): Promise<Session | null> => {
   try {
     const payload = await createApiClient(token).get<unknown>('/auth/session');
     const parsed = sessionSchema.safeParse(payload);
-    return parsed.success ? parsed.data : null;
+
+    if (!parsed.success) {
+      // Distinguishable from "signed out" on purpose. This branch means the API's
+      // response did not match the shared contract — the API is older than the
+      // schema, or a field was added on one side only. Returning a bare `null`
+      // makes that look exactly like an expired session, so the operator sees a
+      // sign-in page and the logs say nothing. It cost an hour once; it will not
+      // cost two.
+      console.error(
+        '[session] /auth/session did not match the contract — check that the API is ' +
+          'built from the same schema version:',
+        parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`),
+      );
+      return null;
+    }
+
+    return parsed.data;
   } catch (error) {
     // A rejected token is "signed out". A transport failure is also "we cannot
     // prove you are signed in", which is the same answer to the same question.
