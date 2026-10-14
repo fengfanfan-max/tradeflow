@@ -8,6 +8,10 @@ the interesting decisions are written down in [`docs/adr/`](docs/adr/).
 
 **Stack:** Next.js · NestJS · PostgreSQL · TypeScript · AWS
 
+<p align="center">
+  <img src="docs/screenshots/01-dashboard.jpg" alt="Tradeflow dashboard — today's jobs, unpaid invoices, accepted work waiting to be booked" width="880" />
+</p>
+
 ---
 
 ## Run it
@@ -33,6 +37,15 @@ cluster under `.pgdata/` and listens on a non-default port. `./scripts/db-local.
 removes it.
 
 ### What to click
+
+<p align="center">
+  <img src="docs/screenshots/04-ai-draft.jpg" alt="Drafting quote lines from the customer's own words" width="880" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/02-public-quote.jpg" alt="The customer's quote page — no account, printable" width="880" />
+</p>
+
 
 The demo follows one document through the whole business.
 
